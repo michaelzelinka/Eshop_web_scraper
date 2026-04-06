@@ -2,8 +2,8 @@ name: Daily Price Scrape
 
 on:
   schedule:
-    - cron: "0 6 * * *"     # každý den v 06:00
-  workflow_dispatch:         # možnost ručního spuštění
+    - cron: "0 6 * * *"
+  workflow_dispatch:
 
 jobs:
   scrape:
@@ -21,6 +21,9 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      - name: Install Playwright browsers
+        run: playwright install --with-deps chromium
+
       - name: Run scraper
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
@@ -37,5 +40,5 @@ jobs:
         if: failure()
         run: |
           curl -H "Content-Type: application/json" \
-            -d "{\"content\": \"❌ GitHub Action Failed: scraper crashed or threw an exception.\"}" \
+            -d "{\"content\": \"❌ GitHub Action Failed: scraper crashed.\"}" \
             ${{ secrets.DISCORD_WEBHOOK }}
