@@ -1,116 +1,167 @@
 import re
+import json
 from bs4 import BeautifulSoup
 
-# Regex pro české ceny ve tvaru:
-# 149 Kč
-# 1 490 Kč
-# 1.490 Kč
-# 149,90 Kč
 PRICE_REGEX = r"(?:\b|^)(\d{1,3}(?:[ .]\d{3})*(?:,\d{2})?)\s*Kč"
 
+# ---------------------------------------------
+# ✅ HELPERY
+# ---------------------------------------------
 
-def extract_price(html_text: str):
-    """
-    Robustní extrakce ceny:
-    1) najde všechny cenové výskyty v textu
-    2) převede všechny na float
-    3) odfiltruje extrémy (příliš nízké/vysoké, přeškrtnuté staré ceny)
-    4) vrátí NEJNIŽŠÍ reálnou cenu (typicky správná koncová cena produktu)
-    """
-
-    matches = re.findall(PRICE_REGEX, html_text)
-    if not matches:
+def _to_float(raw):
+    if not raw:
+        return None
+    cleaned = (
+        raw.replace(" ", "")
+           .replace("\xa0", "")
+           .replace(".", "")
+           .replace(",", ".")
+    )
+    try:
+        return float(cleaned)
+    except:
         return None
 
+
+# ---------------------------------------------
+# ✅ 1) SHOPTET – přesný selektor
+# ---------------------------------------------
+def extract_shoptet_price(soup):
+    """
+    Shoptet má cenu v <strong> v sekci top-products-content.
+    Je to přesně to, co jsi poslal jako HTML ukázku.
+    """
+    candidates = soup.select("strong")
     prices = []
-    for raw in matches:
-        cleaned = (
-            raw.replace(" ", "")
-               .replace(".", "")
-               .replace(",", ".")
-        )
-        try:
-            value = float(cleaned)
-            prices.append(value)
-        except:
-            pass
+
+    for c in candidates:
+        txt = c.get_text(strip=True)
+        if "Kč" in txt:
+            val = _to_float(txt.replace("Kč", "").strip())
+            if val:
+                prices.append(val)
 
     if not prices:
         return None
 
-    # Filtr extrémních hodnot (např. 0.0 Kč nebo 100 000 Kč)
-    filtered = [p for p in prices if 10 < p < 20000]
-
-    if not filtered:
-        filtered = prices
-
-    # Vracíme nejnižší cenu — u CZ e‑shopů je to *téměř vždy* reálná aktuální cena
-    return min(filtered)
+    # Nejnižší je obvykle správná
+    return min(prices)
 
 
-def extract_availability(html_text: str):
+def extract_shoptet_availability(soup):
     """
-    Detekce dostupnosti pro české e‑shopy.
-    Zvládá běžné varianty:
-    - skladem
-    - skladem do X dnů
-    - dostupné do X hodin / dnů
-    - odesíláme do X dnů
-    - na objednávku
-    - dočasně nedostupné
-    - zboží na dotaz
+    Shoptet dostupnost bývá v .availability nebo .availability-value.
+    Pokud není, padáme na textovou heuristiku.
     """
+    els = soup.select(".availability, .availability-value, .product-availability")
+    if els:
+        t = els[0].get_text(" ", strip=True).lower()
 
-    t = html_text.lower()
+        if "skladem" in t:
+            return t  # např. "skladem do 3 dnů"
+        if "není" in t or "nedostupné" in t:
+            return "nedostupné"
+        return t
 
-    # ✅ jednoznačné skladem
-    if "skladem" in t:
-        # rozlišíme, jestli je to pouze "skladem" nebo "skladem do X"
-        if "do" in t and "dn" in t:
-            return "skladem do X dnů"
-        if "do" in t and "hodin" in t:
-            return "skladem do X hodin"
-        if "více než" in t or "kus" in t:
-            return "skladem (omezené množství)"
-        return "skladem"
+    return None
 
-    # ✅ dostupnost s časem
-    if "do" in t and "hodin" in t:
-        return "dostupné do X hodin"
-    if "do" in t and ("dn" in t or "den" in t):
-        return "dostupné do X dnů"
-    if "odesíláme do" in t:
-        return "odesíláme do X dnů"
 
-    # ✅ typické "nižší priorita" dostupnosti
-    if "na objednávku" in t or "objednávku" in t:
-        return "na objednávku"
+# ---------------------------------------------
+# ✅ 2) WOO COMMERCE – spokojenypes.cz
+# ---------------------------------------------
+def extract_woocommerce_from_json(html):
+    """
+    WooCommerce (Spokojenypes.cz) dává cenu do dataLayer JSON.
+    Tento JSON máme v ukázce.
+    """
+    if "dataLayer.push" not in html:
+        return None, None
 
-    # ✅ klasické nedostupnosti
-    if (
-        "dočasně" in t
-        or "nedostupné" in t
-        or "vyprodáno" in t
-        or "zboží na dotaz" in t
-        or "není skladem" in t
-    ):
-        return "nedostupné"
+    # Pokusíme se izolovat JSON objekt
+    try:
+        start = html.index("dataLayer.push({")
+        end = html.index("});", start) + 1
+        json_block = html[start+15:end-1]
+
+        data = json.loads(json_block)
+        price = data.get("page.detail.products", {}).get("priceWithVat")
+        availability = data.get("page.detail.products", {}).get("available")
+
+        return price, availability
+    except:
+        return None, None
+
+
+# ---------------------------------------------
+# ✅ 3) GENERICKÁ DOSTUPNOST
+# ---------------------------------------------
+def extract_availability_generic(text):
+    t = text.lower()
+
+    patterns = {
+        "skladem": "skladem",
+        "do 24 hodin": "dostupné do 24 hodin",
+        "do 48 hodin": "dostupné do 48 hodin",
+        "do 3 dn": "dostupné do 3 dnů",
+        "do 7 dn": "dostupné do 7 dnů",
+        "odesíláme": "odesíláme brzy",
+        "na objednávku": "na objednávku",
+        "vyprodáno": "nedostupné",
+        "nedostupné": "nedostupné"
+    }
+
+    for key, val in patterns.items():
+        if key in t:
+            return val
 
     return "nejasné"
 
 
-def extract_data(html: str):
-    """
-    Extrakce celé stránky:
-    - z HTML → čistý text
-    - extrakce ceny
-    - extrakce dostupnosti
-    """
+# ---------------------------------------------
+# ✅ 4) FALLBACK PRICE – regex
+# ---------------------------------------------
+def extract_price_regex(text):
+    matches = re.findall(PRICE_REGEX, text)
+    prices = [_to_float(m) for m in matches if _to_float(m)]
+    prices = [p for p in prices if 10 < p < 20000]
 
+    if not prices:
+        return None
+
+    return min(prices)
+
+
+# ---------------------------------------------
+# ✅ FINÁLNÍ EXTRAKTOR
+# ---------------------------------------------
+def extract_data(html: str):
     soup = BeautifulSoup(html, "html.parser")
     raw_text = soup.get_text(" ", strip=True)
 
+    price, availability = None, None
+
+    # 1) WooCommerce JSON (Spokojenypes.cz)
+    p_json, a_json = extract_woocommerce_from_json(html)
+    if p_json:
+        price = p_json
+        availability = a_json
+
+    # 2) Shoptet (Goddo.cz, MujPsidum.cz)
+    if not price:
+        price = extract_shoptet_price(soup)
+
+    if not availability:
+        availability = extract_shoptet_availability(soup)
+
+    # 3) fallback dostupnost
+    if not availability:
+        availability = extract_availability_generic(raw_text)
+
+    # 4) fallback cena přes regex
+    if not price:
+        price = extract_price_regex(raw_text)
+
     return {
-        "price": extract_price(raw_text),
-        "availability": extract_availability(raw_text)
+        "price": price,
+        "availability": availability
     }
