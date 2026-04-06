@@ -82,7 +82,7 @@ Projekt byl navržen jako:
 
 ---
 
-✅ Local run
+## ✅ Local run
 Shellpip install -r requirements.txtpython run.pyZobrazit více řádků
 Tím se vytvoří:
 
@@ -90,7 +90,7 @@ output.csv
 případně aktualizuje Google Sheet (pokud je SHEET_ID vyplněný)
 
 
-✅ Secrets (GitHub Actions)
+## ✅ Secrets (GitHub Actions)
 V repozitáři → Settings → Secrets → Actions
 
 Secret name - Popis
@@ -101,7 +101,7 @@ EMAIL_PASSWORD - SMTP heslo (volitelné)
 Google Sheet - musí být sdílen s účtem: your-service-account@project-id.iam.gserviceaccount.com
 
 
-✅ GitHub Actions (cron)
+## ✅ GitHub Actions (cron)
 Workflow je v:
 .github/workflows/scrape.yml
 
@@ -113,7 +113,7 @@ export do Google Sheets
 odeslání alertů při selhání
 
 
-✅ Pro koho je projekt určen?
+## ✅ Pro koho je projekt určen?
 
 malé e‑shopy (Shoptet, WooCommerce, Shopify, custom CMS)
 kteří chtějí:
@@ -124,7 +124,7 @@ sledovat zlevňování
 jednoduchý přehled bez velkého SaaS řešení
 
 
-✅ Co by mohlo následovat (roadmap)
+## ✅ Co by mohlo následovat (roadmap)
 
 webové UI pro konfiguraci produktů
 timeline grafy cen v Google Sheets
@@ -133,6 +133,6 @@ alerty na změnu ceny přímo klientovi
 jednoduchý hosted dashboard
 
 
-✅ Licence
+## ✅ Licence
 MIT
 
