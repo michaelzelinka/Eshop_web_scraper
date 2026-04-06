@@ -2,8 +2,8 @@ name: Daily Price Scrape
 
 on:
   schedule:
-    - cron: "0 7 * * *"   # každý den v 07:00 ráno
-  workflow_dispatch:       # možnost ručního spuštění
+    - cron: "0 6 * * *"
+  workflow_dispatch:
 
 jobs:
   scrape:
@@ -11,10 +11,10 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4   # ✅ updated
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5   # ✅ updated
         with:
           python-version: "3.11"
 
@@ -25,16 +25,11 @@ jobs:
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
           GOOGLE_CREDS: ${{ secrets.GOOGLE_CREDS }}
-          EMAIL_LOGIN: ${{ secrets.EMAIL_LOGIN }}
-          EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
-          ALERT_EMAIL_LOGIN: ${{ secrets.ALERT_EMAIL_LOGIN }}
-          ALERT_EMAIL_PASS: ${{ secrets.ALERT_EMAIL_PASS }}
         run: python run.py
 
-      # ✅ Alert jen když celé workflow selže (chyba pythonu / timeout / network atd.)
       - name: Notify Discord on failure
         if: failure()
         run: |
           curl -H "Content-Type: application/json" \
-          -d "{\"content\": \"❌ *GitHub Action Failed:* scraper crashed or threw an exception.\"}" \
+          -d "{\"content\": \"❌ GitHub Action Failed: scraper crashed or threw an exception.\"}" \
           ${{ secrets.DISCORD_WEBHOOK }}
