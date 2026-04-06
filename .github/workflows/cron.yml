@@ -1,29 +1,40 @@
-name: Daily scrape
+name: Daily Price Scrape
 
 on:
   schedule:
-    - cron: "0 7 * * *"
-  workflow_dispatch:
+    - cron: "0 7 * * *"   # každý den v 07:00 ráno
+  workflow_dispatch:       # možnost ručního spuštění
 
 jobs:
   scrape:
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
 
-      - name: Setup Python
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.11'
+          python-version: "3.11"
 
-      - name: Install deps
+      - name: Install dependencies
         run: pip install -r requirements.txt
 
       - name: Run scraper
         env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
           GOOGLE_CREDS: ${{ secrets.GOOGLE_CREDS }}
           EMAIL_LOGIN: ${{ secrets.EMAIL_LOGIN }}
           EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
           ALERT_EMAIL_LOGIN: ${{ secrets.ALERT_EMAIL_LOGIN }}
           ALERT_EMAIL_PASS: ${{ secrets.ALERT_EMAIL_PASS }}
         run: python run.py
+
+      # ✅ Alert jen když celé workflow selže (chyba pythonu / timeout / network atd.)
+      - name: Notify Discord on failure
+        if: failure()
+        run: |
+          curl -H "Content-Type: application/json" \
+          -d "{\"content\": \"❌ *GitHub Action Failed:* scraper crashed or threw an exception.\"}" \
+          ${{ secrets.DISCORD_WEBHOOK }}
