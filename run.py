@@ -1,17 +1,17 @@
 from scraper import scrape_all
-from utilities import save_csv, upload_to_sheets, send_alert_email
+from utilities import save_csv, upload_to_sheets
+from send_alert import send_discord_alert   # ✅ přidáno
 
-SHEET_ID = "TVŮJ_GOOGLE_SHEET_ID"  #Název souboru dle klienta
-
+SHEET_ID = "TVŮJ_SHEET_ID"   # vyplníš později nebo necháš prázdné
 
 if __name__ == "__main__":
     print("▶ Running scraper...")
 
     results = scrape_all()
 
-    # Error detection
+    # ✅ Error detection — pošli alert jen tobě
     if any(r["price"] is None for r in results):
-        send_alert_email("⚠️ Scraper: Některé ceny se nepodařilo načíst.")
+        send_discord_alert("Některé ceny se nepodařilo načíst. Zkontroluj scraper!")
 
     save_csv(results)
 
