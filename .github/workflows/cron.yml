@@ -1,0 +1,29 @@
+name: Daily scrape
+
+on:
+  schedule:
+    - cron: "0 7 * * *"
+  workflow_dispatch:
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install deps
+        run: pip install -r requirements.txt
+
+      - name: Run scraper
+        env:
+          GOOGLE_CREDS: ${{ secrets.GOOGLE_CREDS }}
+          EMAIL_LOGIN: ${{ secrets.EMAIL_LOGIN }}
+          EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+          ALERT_EMAIL_LOGIN: ${{ secrets.ALERT_EMAIL_LOGIN }}
+          ALERT_EMAIL_PASS: ${{ secrets.ALERT_EMAIL_PASS }}
+        run: python run.py
