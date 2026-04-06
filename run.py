@@ -34,4 +34,3 @@ if __name__ == "__main__":
                 send_discord_alert(f"Google Sheets upload selhal: {e}")
 
     print("✅ Hotovo.")
-``
