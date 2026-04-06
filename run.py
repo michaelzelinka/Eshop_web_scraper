@@ -1,36 +1,21 @@
-from scraper import scrape_all
-from utilities import (
-    save_csv,
-    upload_to_sheets,
-    validate_results,
-    send_discord_alert
-)
+from scraper_playwright import scrape_with_playwright
+from utilities import save_csv, upload_to_sheets, validate_results, send_discord_alert
+import json
 
 SHEET_ID = "1A1tylaob6it1_BKXqTkbwv_Duqm6rQrSqYU9FEnAHf8"
 
-
 if __name__ == "__main__":
-    print("▶ Spouštím scraper…")
+    print("▶ Spouštím Playwright scraper…")
 
-    # 1) Scrapování
-    results = scrape_all()
+    with open("products.json") as f:
+        products = json.load(f)
 
-    # 2) Validace
+    results = scrape_with_playwright(products)
+
     if not validate_results(results):
-        print("⚠️ Scraper dokončen s chybami.")
-        # Upozornění šlo již přes Discord → nemusíme pokračovat dál
-        # ale CSV uložíme vždy, kvůli debug účelům
         save_csv(results)
     else:
-        print("✅ Scraper dokončen bez kritických chyb.")
         save_csv(results)
-
-        # 3) Google Sheet export
-        if SHEET_ID and SHEET_ID != "TVŮJ_SHEET_ID":
-            try:
-                upload_to_sheets(results, SHEET_ID)
-            except Exception as e:
-                print(f"❌ Chyba při uploadu do Sheets: {e}")
-                send_discord_alert(f"Google Sheets upload selhal: {e}")
+        upload_to_sheets(results, SHEET_ID)
 
     print("✅ Hotovo.")
