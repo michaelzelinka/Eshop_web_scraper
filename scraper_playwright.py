@@ -51,4 +51,3 @@ def scrape_with_playwright(products):
         browser.close()
 
     return results
-``
