@@ -1,23 +1,28 @@
 import json
 import time
 import requests
-from scraper.extractor import extract_data
+from extractor import extract_data
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0"
 }
 
+
 def load_products():
-    with open("scraper/products.json", "r", encoding="utf-8") as f:
+    with open("products.json", "r", encoding="utf-8") as f:
         return json.load(f)
+
 
 def fetch_html(url: str):
     try:
         resp = requests.get(url, timeout=10, headers=HEADERS)
-        return resp.text
-    except Exception as e:
-        print(f"[ERROR] Nemohu načíst {url}: {e}")
+        if resp.status_code == 200:
+            return resp.text
         return None
+    except Exception as e:
+        print(f"[ERROR] Failed to load {url}: {e}")
+        return None
+
 
 def scrape_all():
     products = load_products()
@@ -28,6 +33,7 @@ def scrape_all():
 
         for url in p["competitors"]:
             html = fetch_html(url)
+
             if not html:
                 results.append({
                     "product": product_name,
@@ -45,6 +51,6 @@ def scrape_all():
                 "availability": data["availability"]
             })
 
-            time.sleep(1)  # šetrné
+            time.sleep(1)  # be gentle to shops
 
     return results
